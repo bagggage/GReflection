@@ -144,6 +144,9 @@
     <ClInclude Include="src\meta\reflection-builder.h" />
     <ClInclude Include="src\meta\meta-method.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\meta\reflection-builder.cpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

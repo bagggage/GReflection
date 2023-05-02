@@ -10,7 +10,8 @@
 
 namespace GR 
 {
-	bool isReflectionBuilderInitializedStatic = false;
+	bool IsReflectionBuilderInitializedStatic();
+	void SetIsReflectionBuilderInitializedStatic(bool value);
 
 	class ReflectionBuilder
 	{
@@ -32,7 +33,7 @@ namespace GR
 
 			va_end(args);
 
-			return &types[typeid(T).hash_code()];
+			return &GetTypes()[typeid(T).hash_code()];
 		}
 
 		template <typename T>
@@ -46,6 +47,15 @@ namespace GR
 			type.namespaces = GetTypeNamespaces(rawTypeName);
 			type.name = rawTypeName;
 			type.pointers = std::count(rawTypeName.begin(), rawTypeName.end(), '*');
+			type.newOperator = &NewOperator<T>;
+			type.copyConstructor = &CopyConstructor<T>;
+
+			if constexpr (std::is_const_v<T> == false)
+				type.setOperator = &SetOperator<T>;
+			else
+				type.setOperator = nullptr;
+
+			type.deleteOperator = &DeleteOperator<T>;
 
 			if constexpr (std::is_void_v<T>)
 				type.size = 0;
@@ -54,9 +64,12 @@ namespace GR
 
 			type.hash = std::hash<MetaType>{}(type);
 
-			types.insert(std::pair(typeid(T).hash_code(), type));
+			type.isConst = std::is_const_v<T>;
+			type.isReference = std::is_reference_v<T>;
 
-			return &types[typeid(T).hash_code()];
+			GetTypes().insert(std::pair(typeid(T).hash_code(), type));
+
+			return &GetTypes()[typeid(T).hash_code()];
 		}
 
 		template<typename T, typename... Bases>
@@ -77,18 +90,29 @@ namespace GR
 			return GetDynamicType<T>();
 		}
 
+		template<typename Return, typename... Args>
+		static const MetaFunction* GetFunction(Return (*function)(Args...)) 
+		{
+			if (GetFunctions().count((size_t)function) == 0)
+				return ReflectFunction<Return, Args...>(std::string(GetTypeName<decltype(function)>()), function);
+
+			return &GetFunctions()[(size_t)function];
+		}
+
 		template<typename T>
 		static bool IsEquals(const MetaType* type) 
 		{
-			return (type == &types[typeid(T).hash_code()]);
+			return (type == &GetTypes()[typeid(T).hash_code()]);
 		}
 
 		static void Destroy() 
 		{
-			types.clear();
+			GetTypes().clear();
+			GetFunctions().clear();
 		}
 	private:
-		static std::unordered_map<size_t, MetaType> types;
+		static std::unordered_map<size_t, MetaType>& GetTypes();
+		static std::unordered_map<size_t, MetaFunction>& GetFunctions();
 
 		template<typename T, typename Base>
 		static void AssertIsBase() 
@@ -115,6 +139,27 @@ namespace GR
 			*(decltype(member)*)method.pointer = member;
 		}
 
+		template<typename Return, typename... Args>
+		static const MetaFunction* ReflectFunction(const std::string& name, Return (*function)(Args...)) 
+		{
+			MetaFunction metaFunc;
+
+			metaFunc.name = name;
+			metaFunc.returnType = GetDynamicType<Return>();
+			(metaFunc.arguments.push_back(GetDynamicType<Args>()), ...);
+
+			metaFunc.pointerSize = sizeof(Return(*)(Args...));
+			metaFunc.pointer = std::malloc(metaFunc.pointerSize);
+
+			*(decltype(function)*)metaFunc.pointer = function;
+
+			metaFunc.hash = (size_t)function;
+
+			GetFunctions().insert(std::pair<size_t, MetaFunction>((size_t)function, metaFunc));
+
+			return &GetFunctions()[(size_t)function];
+		}
+
 		template<typename Type, typename Owner>
 		static void ReflectField(const std::string& name, Type Owner::*member)
 		{
@@ -132,16 +177,10 @@ namespace GR
 		template <typename T>
 		static MetaType* GetDynamicType()
 		{
-			if (isReflectionBuilderInitializedStatic == false)
-			{
-				types = std::unordered_map<size_t, MetaType>();
-				isReflectionBuilderInitializedStatic = true;
-			}
-
-			if (types.count(typeid(T).hash_code()) == 0)
+			if (GetTypes().count(typeid(T).hash_code()) == 0)
 				RegisterType<T>();
 
-			return &types[typeid(T).hash_code()];
+			return &GetTypes()[typeid(T).hash_code()];
 		}
 
 		static std::string GetTemplateValue(std::string& rawTypeName)
@@ -236,6 +275,4 @@ namespace GR
 	{
 		return GR::ReflectionBuilder::IsEquals<T>(this);
 	}
-
-	std::unordered_map<size_t, MetaType> ReflectionBuilder::types = isReflectionBuilderInitializedStatic ? types : std::unordered_map<size_t, MetaType>();
 }
