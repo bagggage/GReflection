@@ -2,6 +2,7 @@
 #include <meta/reflection-builder.h>
 #include <g-reflection.h>
 #include <vector>
+#include <Windows.h>
 
 static const int b = 0.2f;
 
@@ -19,11 +20,17 @@ enum class FiveClass
 	b
 };
 
+struct Gang 
+{
+public:
+	std::string text;
+};
+
 namespace Some
 {
-	class Forward
+	class Forward : public Gang
 	{
-		REFLECT_CLASS(Forward, ())
+		REFLECT_CLASS(Forward, (Gang))
 	};
 
 	class Test : public Forward
@@ -42,6 +49,11 @@ namespace Some
 			return a;
 		}
 
+		static void StaticFunction(float gang) 
+		{
+			std::cout << gang << '\n';
+		}
+
 		REFLECT_CLASS(Test, (Forward), speed, a, b, c, someMethod)
 	};
 
@@ -55,6 +67,11 @@ union MyUnion
 };
 
 using namespace Some;
+
+int Boo(const std::string& name, float grow) 
+{
+	return name.size() + grow;
+}
 
 int main()
 {
@@ -74,7 +91,9 @@ int main()
 	(s.*someMPtr)();
 	(s.**((float(Test::**)(void))ptr))();*/
 
-	std::cout << Test::GetStaticType()->GetName();
+	//Test Reflection for classes
+
+	/*std::cout << Test::GetStaticType()->GetName();
 
 	for (int i = 0; i < Test::GetStaticType()->GetBases().size(); i++)
 		std::cout << " : " << Test::GetStaticType()->GetBases()[i]->GetName() << std::endl;
@@ -91,7 +110,7 @@ int main()
 		std::cout << "method: " << methods[i].GetReturnType()->GetName() << ' ' << methods[i].GetName() << std::endl;
 
 		for (int j = 0; j < methods[i].GetArguments().size(); j++)
-			std::cout << '\t' << methods[i].GetArguments()[j]->GetName() << ' ' << methods[i].GetArguments()[j]->GetHash() << std::endl;
+			std::cout << '\t' << methods[i].GetArguments()[j]->GetName() << std::endl;
 	}
 
 	Test a;
@@ -104,6 +123,39 @@ int main()
 	a.GetStaticType()->GetMethods()[0].Invoke<void>(&a, 615165.f, 67.f);
 	a.GetStaticType()->GetFields()[0].SetValue(&a, 15.0101f);
 	a.GetStaticType()->GetMethods()[0].Invoke<void>(&a, a.GetStaticType()->GetFields()[0].GetValue<float>(&a), 45.545f);
+
+	const GR::MetaType* boolType = GR::ReflectionBuilder::Reflect<Gang, std::string>({ "Gang::field" }, &Gang::text);
+
+	std::cout << boolType->GetFields()[0].GetName() << std::endl;
+
+	boolType->IsEquals<bool>();
+
+	const GR::MetaType* oldFloat = GR::ReflectionBuilder::GetType<float>();
+	const GR::MetaType* newFloat = GR::ReflectionBuilder::RegisterType<float>();
+
+	if (oldFloat != GR::ReflectionBuilder::GetType<float>())
+		std::cout << "Missmatching!!!" << std::endl;
+	else if (newFloat != oldFloat)
+		std::cout << "Memory leak" << std::endl;
+
+	std::cout << GR::ReflectionBuilder::IsEquals<int>(a.GetStaticType()->GetFields()[0].GetType()) << std::endl;
+	std::cout << GR::ReflectionBuilder::IsEquals<float>(a.GetStaticType()->GetFields()[0].GetType()) << std::endl;
+	std::cout << GR::ReflectionBuilder::IsEquals<double*>(a.GetStaticType()->GetFields()[0].GetType()) << std::endl;
+	std::cout << GR::ReflectionBuilder::IsEquals<Test>(a.GetStaticType()->GetFields()[0].GetType()) << std::endl;*/
+
+	//Test for functions
+
+	const GR::MetaFunction* booFunc = GR::ReflectionBuilder::GetFunction(&Boo);
+	const GR::MetaFunction* staticFunc = GR::ReflectionBuilder::GetFunction(&Test::StaticFunction);
+
+	/*std::cout << booFunc->GetName() << "\nReturn Type: " << booFunc->GetReturnType()->GetName() << ", IsConst: " << booFunc->GetReturnType()->IsConst() << "\nArgs:\n";
+
+	for (int i = 0; i < booFunc->GetArguments().size(); i++)
+		std::cout << booFunc->GetArguments()[i]->GetName() << '\n';*/
+
+	GR::ReflectionBuilder::GetType<Test>()->operator<<(std::cout);
+
+	staticFunc->Invoke<void>(52.65f);
 
 	//PrintMacro(REFLECT_CLASS(Test, a, b, c));
 
